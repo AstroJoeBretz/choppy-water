@@ -21,6 +21,7 @@ from typing import Protocol
 
 import numpy as np
 from scipy import ndimage
+from scipy.fft import next_fast_len
 
 from choppy_water.config import Config, Part, Water
 from choppy_water.spectrum import WaveBand, energy, spectrum_2d, spread_sigma
@@ -42,7 +43,8 @@ class FFTWaveField:
     """Periodic random sea synthesized on an FFT grid, spline-interpolated on demand."""
 
     def __init__(self, water: Water, grid_spacing: float, rng: np.random.Generator) -> None:
-        n = 2 ** math.ceil(math.log2(max(water.patch_size / grid_spacing, 8)))
+        wanted = max(math.ceil(water.patch_size / grid_spacing), 8)
+        n = next_fast_len(wanted + wanted % 2)  # smooth composite size, not a power of two
         if n > MAX_SIM_GRID:
             raise ValueError(
                 f"water.patch_size / mesh.grid_spacing needs a {n}x{n} FFT grid "

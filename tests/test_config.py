@@ -1,13 +1,16 @@
 import dataclasses
 import tomllib
-from pathlib import Path
 
 import pytest
 
-from choppy_water.config import MM_PER_INCH, Config, ConfigError, load_config, parse_override
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TOML = REPO_ROOT / "config" / "default.toml"
+from choppy_water.config import (
+    MM_PER_INCH,
+    Config,
+    ConfigError,
+    default_config_text,
+    load_config,
+    parse_override,
+)
 
 
 def test_defaults_match_requested_values():
@@ -20,10 +23,17 @@ def test_defaults_match_requested_values():
 
 
 def test_default_toml_equals_dataclass_defaults():
-    """config/default.toml is documentation users copy; it must not drift from the code."""
-    with open(DEFAULT_TOML, "rb") as fh:
-        raw = tomllib.load(fh)
-    assert Config.from_dict(raw) == Config()
+    """default.toml is what users copy and edit; it must not drift from the code."""
+    assert Config.from_dict(tomllib.loads(default_config_text())) == Config()
+
+
+def test_default_toml_documents_every_key():
+    raw = tomllib.loads(default_config_text())
+    expected = {
+        section: {f.name for f in dataclasses.fields(getattr(Config(), section))}
+        for section in Config().to_dict()
+    }
+    assert {section: set(keys) for section, keys in raw.items()} == expected
 
 
 def test_partial_config_fills_in_defaults():

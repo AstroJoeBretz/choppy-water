@@ -1,0 +1,10 @@
+# Choppy: the default look, spelled out. Sharp-ish crests with broad troughs.
+
+[water]
+seed                   = 42
+wavelength_dominant    = 0.8
+wavelength_min         = 0.3
+wavelength_max         = 1.6
+directional_spread_deg = 40.0
+choppiness             = 0.8
+relief                 = 0.25

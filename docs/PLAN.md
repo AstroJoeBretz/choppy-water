@@ -32,8 +32,8 @@ A 3-axis mill can only cut single-valued surfaces z(x, y), so the model is a hei
 ## Repo layout
 
 ```
-config/default.toml       commented defaults (kept in sync with code by a test)
 src/choppy_water/
+  default.toml            commented defaults (kept in sync with code by a test)
   config.py               TOML -> typed dataclasses, validation, unit conversion
   cli.py                  command line
   spectrum.py             (Phase 1)
@@ -56,7 +56,7 @@ examples/
 | 1. Heightfield (done) | Spectrum, FFT height field, choppiness, relief normalization, PNG preview | Same seed gives same surface; preview looks like choppy water |
 | 2. Solid and STL (done) | Disc and rectangle meshes, flat bottom, walls, binary STL, unit handling | Watertight, outward normals, correct volume and bounding box for both shapes |
 | 3. Milling awareness (done) | Tool-reachability filter, slope/stock checks, report | Warns or fixes features the cutter cannot make |
-| 4. Polish, v0.1 | README gallery, presets, docs, ~80% coverage | A stranger gets an STL in three commands |
+| 4. Polish, v0.1 (done) | README gallery, presets, docs, ~80% coverage | A stranger gets an STL in three commands |
 | 5. Stretch | Time parameter, rim/bevel, rect corner radius, G-code, GUI | Optional |
 
 ## Testing

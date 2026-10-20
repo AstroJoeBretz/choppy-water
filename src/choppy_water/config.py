@@ -1,6 +1,7 @@
 """Typed configuration: load from TOML, validate, and convert units.
 
-Every section is a frozen dataclass whose defaults mirror ``config/default.toml``.
+Every section is a frozen dataclass whose defaults mirror the packaged ``default.toml``
+(see :func:`default_config_text`).
 A user config only needs to list the keys it changes. Lengths are expressed in
 ``units.length`` ("in" or "mm"); call :meth:`Config.to_mm` to get a copy in
 millimetres for the geometry code.
@@ -14,6 +15,7 @@ import math
 import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, fields
+from importlib import resources
 from pathlib import Path
 from typing import Any, get_type_hints
 
@@ -307,6 +309,11 @@ class Config:
 
 
 # -- loading ------------------------------------------------------------------------------
+
+
+def default_config_text() -> str:
+    """The commented default config shipped with the package (a starting point to copy)."""
+    return resources.files("choppy_water").joinpath("default.toml").read_text(encoding="utf-8")
 
 
 def parse_override(text: str) -> tuple[str, str, Any]:

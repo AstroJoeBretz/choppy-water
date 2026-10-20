@@ -25,6 +25,7 @@ from choppy_water.heightfield import Heightfield, footprint_mask, slope_degrees
 # Extra material thinner than this (mm) is not worth reporting as "unreachable".
 FILL_TOLERANCE_MM = 0.01
 UNREACHABLE_WARN_FRACTION = 0.01
+STEEP_WARN_FRACTION = 0.005
 
 
 def close_with_ball(z: np.ndarray, radius: float, spacing: float) -> np.ndarray:
@@ -113,7 +114,7 @@ def plan_milling(config: Config, ideal: Heightfield) -> tuple[Heightfield, Milli
             f"{unreachable:.1%} of the part is finer than the {ml.tool_diameter:.2f} mm cutter "
             f"can reach; those valleys are {outcome}"
         )
-    if steep > 0:
+    if steep > STEEP_WARN_FRACTION:
         warnings.append(
             f"{steep:.1%} of the surface is steeper than {ml.max_slope_deg:g} deg; "
             "expect a rougher finish there (try a smaller tool or lower choppiness)"

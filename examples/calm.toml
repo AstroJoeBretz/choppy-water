@@ -1,0 +1,11 @@
+# Calm: long, gentle swells with rounded crests. Easy on the cutter and on the wood.
+# Only the values that differ from the defaults are listed.
+
+[water]
+seed                   = 7
+wavelength_dominant    = 1.0
+wavelength_min         = 0.35
+wavelength_max         = 1.8
+directional_spread_deg = 20.0
+choppiness             = 0.35
+relief                 = 0.20

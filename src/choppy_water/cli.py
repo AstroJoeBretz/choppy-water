@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from choppy_water import __version__
-from choppy_water.config import Config, ConfigError, load_config
+from choppy_water.config import Config, ConfigError, default_config_text, load_config
 from choppy_water.heightfield import generate_heightfield
 from choppy_water.mesh import build_solid
 from choppy_water.milling import format_report, plan_milling
@@ -39,6 +39,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--show-config", action="store_true", help="print the resolved configuration as JSON"
     )
+    parser.add_argument(
+        "--write-config",
+        metavar="PATH",
+        help="write a commented copy of the default config to PATH and exit",
+    )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser
 
@@ -66,6 +71,15 @@ def describe(config: Config) -> str:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.write_config:
+        target = Path(args.write_config)
+        if target.exists():
+            print(f"error: {target} already exists; not overwriting", file=sys.stderr)
+            return 1
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(default_config_text(), encoding="utf-8")
+        print(f"Wrote {target}")
+        return 0
     overrides = list(args.overrides)
     if args.seed is not None:
         overrides.append(f"water.seed={args.seed}")

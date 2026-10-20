@@ -1,0 +1,9 @@
+# Plaque: a 5 x 3.5 in rectangle instead of a disc, default water.
+
+[part]
+shape  = "rect"
+width  = 5.0
+length = 3.5
+
+[water]
+seed = 11

@@ -4,7 +4,7 @@ from pathlib import Path
 from choppy_water.cli import main
 from choppy_water.stl_io import read_stl
 
-DEFAULT_TOML = Path(__file__).resolve().parents[1] / "config" / "default.toml"
+DEFAULT_TOML = Path(__file__).resolve().parents[1] / "src" / "choppy_water" / "default.toml"
 FAST = ["--set", "mesh.grid_spacing=0.04", "--set", "mesh.edge_segments=235"]
 
 

@@ -25,9 +25,9 @@ wavelength_min      = 0.3
 wavelength_max      = 1.6
 wind_direction_deg  = 0.0
 directional_spread_deg = 40.0
-choppiness          = 1.0    # 0 = rounded swells; higher = sharper crests
+choppiness          = 0.8    # 0 = rounded swells; ~1 = cusped crests; much above 1 folds the surface
 relief              = 0.25   # peak-to-peak height; must be <= max_thickness - base_thickness
-smoothing           = 0.0    # Gaussian blur radius applied to the finished surface
+smoothing           = 0.0    # Gaussian low-pass radius applied to the waves
 
 [mesh]
 grid_spacing  = 0.01         # surface sample spacing

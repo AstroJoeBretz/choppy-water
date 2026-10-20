@@ -41,6 +41,30 @@ def test_output_shortcut_handles_windows_paths(capsys):
     assert json.loads(out[: out.rindex("}") + 1])["output"]["stl_path"] == r"C:\out dir\x.stl"
 
 
-def test_generation_not_yet_implemented(capsys):
-    assert main([]) == 2
-    assert "not implemented" in capsys.readouterr().err
+def test_run_writes_preview_next_to_stl_path(tmp_path, capsys):
+    stl = tmp_path / "sea.stl"
+    assert main(["--set", "mesh.grid_spacing=0.04", "-o", str(stl)]) == 0
+    captured = capsys.readouterr()
+    assert (tmp_path / "sea.png").is_file()
+    assert "relief 6.35 mm" in captured.out
+    assert "STL export is not implemented" in captured.err  # arrives in Phase 2
+
+
+def test_run_without_preview_writes_nothing(tmp_path, capsys):
+    stl = tmp_path / "sea.stl"
+    args = ["--set", "mesh.grid_spacing=0.04", "--set", "output.preview=false", "-o", str(stl)]
+    assert main(args) == 0
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_run_reports_folded_surface(tmp_path, capsys):
+    args = [
+        "--set",
+        "mesh.grid_spacing=0.04",
+        "--set",
+        "water.choppiness=3",
+        "-o",
+        str(tmp_path / "a.stl"),
+    ]
+    assert main(args) == 0
+    assert "folds over itself" in capsys.readouterr().err

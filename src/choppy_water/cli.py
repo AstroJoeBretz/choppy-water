@@ -6,9 +6,12 @@ import argparse
 import json
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 from choppy_water import __version__
 from choppy_water.config import Config, ConfigError, load_config
+from choppy_water.heightfield import generate_heightfield
+from choppy_water.preview import save_preview
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -82,11 +85,33 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("Configuration OK.")
         return 0
 
+    try:
+        hf = generate_heightfield(config)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    st = hf.stats
     print(
-        "error: surface generation is not implemented yet (planned for Phases 1-2).",
-        file=sys.stderr,
+        f"Surface: {hf.z.shape[1]} x {hf.z.shape[0]} grid, relief {st.relief:.2f} mm, "
+        f"steepest slope {st.max_slope_deg:.0f} deg"
     )
-    return 2
+    if st.unresolved_fraction > 0.01:
+        print(
+            f"warning: surface folds over itself on {st.unresolved_fraction:.1%} of the part; "
+            "lower water.choppiness for clean crests",
+            file=sys.stderr,
+        )
+
+    if config.output.preview:
+        try:
+            png = save_preview(hf, Path(config.output.stl_path).with_suffix(".png"))
+        except RuntimeError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        print(f"Preview: {png}")
+
+    print("note: STL export is not implemented yet (Phase 2).", file=sys.stderr)
+    return 0
 
 
 if __name__ == "__main__":

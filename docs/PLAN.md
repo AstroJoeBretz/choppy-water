@@ -51,8 +51,8 @@ examples/
 
 | Phase | Deliverable | Done when |
 |---|---|---|
-| 0. Scaffold | Repo, `pyproject.toml`, config loader + validation (disc or rect), CLI skeleton, CI, license | `pytest` and `ruff` pass; bad configs give clear errors |
-| 1. Heightfield | Spectrum, FFT height field, choppiness, relief normalization, PNG preview | Same seed gives same surface; preview looks like choppy water |
+| 0. Scaffold (done) | Repo, `pyproject.toml`, config loader + validation (disc or rect), CLI skeleton, CI, license | `pytest` and `ruff` pass; bad configs give clear errors |
+| 1. Heightfield (done) | Spectrum, FFT height field, choppiness, relief normalization, PNG preview | Same seed gives same surface; preview looks like choppy water |
 | 2. Solid and STL | Disc and rectangle meshes, flat bottom, walls, binary STL, unit handling | Watertight, outward normals, correct volume and bounding box for both shapes |
 | 3. Milling awareness | Tool-reachability filter, slope/stock checks, report | Warns or fixes features the cutter cannot make |
 | 4. Polish, v0.1 | README gallery, presets, docs, ~80% coverage | A stranger gets an STL in three commands |

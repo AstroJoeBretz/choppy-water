@@ -4,8 +4,8 @@ Generate a choppy-water surface and export it as a watertight STL for CNC millin
 The piece is either a **disc** or a **rectangle** with a flat bottom and a choppy-water top.
 Every model and milling parameter lives in a TOML config file.
 
-> **Status:** Phase 0 (scaffolding). Config loading, validation and the CLI work;
-> surface generation and STL export are next. See [docs/PLAN.md](docs/PLAN.md).
+> **Status:** Phase 1 (heightfield). The choppy-water surface is generated and rendered to
+> a PNG preview; STL export is next. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Install
 
@@ -20,6 +20,8 @@ pip install -e ".[dev]"
 ## Usage
 
 ```bash
+choppy-water                                          # generate the surface, write output/choppy_water.png
+choppy-water --seed 7 --set water.choppiness=0.5      # try another sea
 choppy-water --check                                  # validate the built-in defaults
 choppy-water --config config/default.toml --check
 choppy-water --set part.shape=rect --set part.width=5 --check

@@ -70,7 +70,7 @@ class Water:
     wavelength_max: float = _length(1.6)
     wind_direction_deg: float = 0.0
     directional_spread_deg: float = 40.0
-    choppiness: float = 1.0
+    choppiness: float = 0.8
     relief: float = _length(0.25)
     smoothing: float = _length(0.0)
 

@@ -11,7 +11,10 @@ from pathlib import Path
 from choppy_water import __version__
 from choppy_water.config import Config, ConfigError, load_config
 from choppy_water.heightfield import generate_heightfield
+from choppy_water.mesh import build_solid
 from choppy_water.preview import save_preview
+from choppy_water.record import write_run_record
+from choppy_water.stl_io import write_stl
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -102,15 +105,29 @@ def main(argv: Sequence[str] | None = None) -> int:
             file=sys.stderr,
         )
 
+    stl_path = Path(config.output.stl_path)
+    solid = build_solid(config, hf)
+    if not solid.is_watertight:  # a bug, not a user error; never hand a broken STL to a CAM tool
+        print("error: internal error: generated mesh is not watertight", file=sys.stderr)
+        return 1
+    write_stl(solid, stl_path, config.output.stl_units)
+    write_run_record(stl_path.with_suffix(".json"), config, hf, solid)
+    low, high = solid.bounds
+    size = high - low
+    print(
+        f"Mesh:    {len(solid.faces):,} triangles,"
+        f" {size[0]:.1f} x {size[1]:.1f} x {size[2]:.1f} mm,"
+        f" volume {solid.volume() / 1000:.1f} cm^3"
+    )
+    print(f"STL:     {stl_path} ({config.output.stl_units})")
+
     if config.output.preview:
         try:
-            png = save_preview(hf, Path(config.output.stl_path).with_suffix(".png"))
+            png = save_preview(hf, stl_path.with_suffix(".png"))
         except RuntimeError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 1
         print(f"Preview: {png}")
-
-    print("note: STL export is not implemented yet (Phase 2).", file=sys.stderr)
     return 0
 
 

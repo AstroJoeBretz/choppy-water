@@ -21,7 +21,6 @@ from typing import Protocol
 
 import numpy as np
 from scipy import ndimage
-from scipy.interpolate import RegularGridInterpolator
 
 from choppy_water.config import Config, Part, Water
 from choppy_water.spectrum import WaveBand, energy, spectrum_2d, spread_sigma
@@ -153,9 +152,26 @@ class Heightfield:
     stats: SurfaceStats
 
     def sample(self, x: np.ndarray, y: np.ndarray, method: str = "linear") -> np.ndarray:
-        """Interpolate the thickness at arbitrary points inside the grid."""
-        interp = RegularGridInterpolator((self.y, self.x), self.z, method=method)
-        return interp(np.stack([np.asarray(y), np.asarray(x)], axis=-1))
+        """Interpolate the thickness at points inside the grid.
+
+        ``method`` is ``"linear"`` (bounded by the neighbouring samples) or ``"cubic"``
+        (smoother, but can overshoot slightly at sharp crests).
+        """
+        x, y = np.broadcast_arrays(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
+        shape = x.shape
+        x, y = x.ravel(), y.ravel()
+        slack = 1e-9 * self.spacing
+        if (
+            x.min() < self.x[0] - slack
+            or x.max() > self.x[-1] + slack
+            or y.min() < self.y[0] - slack
+            or y.max() > self.y[-1] + slack
+        ):
+            raise ValueError("sample points fall outside the heightfield grid")
+        order = {"linear": 1, "cubic": 3}[method]
+        coords = np.stack([(y - self.y[0]) / self.spacing, (x - self.x[0]) / self.spacing])
+        values = ndimage.map_coordinates(self.z, coords, order=order, mode="nearest")
+        return values.reshape(shape)
 
 
 def _axis(half_extent: float, spacing: float) -> np.ndarray:

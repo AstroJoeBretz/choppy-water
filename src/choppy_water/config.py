@@ -286,6 +286,13 @@ class Config:
             notes.append(
                 "mesh.grid_spacing is coarse for wavelength_min (< 10 samples per wavelength)"
             )
+        if p.shape == "disc":
+            ring_spacing = math.pi * p.diameter / m.edge_segments
+            if not 0.5 * m.grid_spacing <= ring_spacing <= 2 * m.grid_spacing:
+                notes.append(
+                    "mesh.edge_segments gives a rim point spacing far from mesh.grid_spacing; "
+                    "keep them within 2x of each other to avoid sliver triangles"
+                )
         if m.grid_spacing > ml.tool_diameter / 4:
             notes.append("mesh.grid_spacing is coarse relative to milling.tool_diameter")
         if ml.enforce_tool_limits and w.wavelength_min < 2 * ml.tool_diameter:

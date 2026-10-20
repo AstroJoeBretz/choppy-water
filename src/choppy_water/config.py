@@ -293,8 +293,11 @@ class Config:
                     "mesh.edge_segments gives a rim point spacing far from mesh.grid_spacing; "
                     "keep them within 2x of each other to avoid sliver triangles"
                 )
-        if m.grid_spacing > ml.tool_diameter / 4:
-            notes.append("mesh.grid_spacing is coarse relative to milling.tool_diameter")
+        if m.grid_spacing > ml.tool_diameter / 10:
+            notes.append(
+                "mesh.grid_spacing is coarse relative to milling.tool_diameter "
+                "(< 10 cells across the cutter): tool-reach estimates will be unreliable"
+            )
         if ml.enforce_tool_limits and w.wavelength_min < 2 * ml.tool_diameter:
             notes.append(
                 "water.wavelength_min < 2 x tool_diameter: the finest ripples will be smoothed "

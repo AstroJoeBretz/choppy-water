@@ -10,10 +10,15 @@ from choppy_water import __version__
 from choppy_water.config import Config
 from choppy_water.heightfield import Heightfield
 from choppy_water.mesh import Solid
+from choppy_water.milling import MillingReport
 
 
 def write_run_record(
-    path: str | Path, config: Config, heightfield: Heightfield, solid: Solid
+    path: str | Path,
+    config: Config,
+    heightfield: Heightfield,
+    solid: Solid,
+    milling: MillingReport,
 ) -> Path:
     """Write ``path`` with the resolved config and the measured result.
 
@@ -24,6 +29,7 @@ def write_run_record(
         "choppy_water_version": __version__,
         "config": config.to_dict(),
         "surface": dataclasses.asdict(heightfield.stats),
+        "milling": dataclasses.asdict(milling),
         "mesh": {
             "vertices": len(solid.vertices),
             "triangles": len(solid.faces),

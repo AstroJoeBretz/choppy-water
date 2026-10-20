@@ -12,6 +12,7 @@ from choppy_water import __version__
 from choppy_water.config import Config, ConfigError, load_config
 from choppy_water.heightfield import generate_heightfield
 from choppy_water.mesh import build_solid
+from choppy_water.milling import format_report, plan_milling
 from choppy_water.preview import save_preview
 from choppy_water.record import write_run_record
 from choppy_water.stl_io import write_stl
@@ -89,21 +90,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     try:
-        hf = generate_heightfield(config)
+        ideal = generate_heightfield(config)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    st = hf.stats
+    hf, report = plan_milling(config, ideal)
     print(
-        f"Surface: {hf.z.shape[1]} x {hf.z.shape[0]} grid, relief {st.relief:.2f} mm, "
-        f"steepest slope {st.max_slope_deg:.0f} deg"
+        f"Surface: {hf.z.shape[1]} x {hf.z.shape[0]} grid, relief {hf.stats.relief:.2f} mm, "
+        f"steepest slope {hf.stats.max_slope_deg:.0f} deg"
     )
-    if st.unresolved_fraction > 0.01:
-        print(
-            f"warning: surface folds over itself on {st.unresolved_fraction:.1%} of the part; "
-            "lower water.choppiness for clean crests",
-            file=sys.stderr,
-        )
+    for note in report.warnings:
+        print(f"warning: {note}", file=sys.stderr)
 
     stl_path = Path(config.output.stl_path)
     solid = build_solid(config, hf)
@@ -111,7 +108,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("error: internal error: generated mesh is not watertight", file=sys.stderr)
         return 1
     write_stl(solid, stl_path, config.output.stl_units)
-    write_run_record(stl_path.with_suffix(".json"), config, hf, solid)
+    write_run_record(stl_path.with_suffix(".json"), config, hf, solid, report)
+    report_path = stl_path.with_name(stl_path.stem + "_milling.txt")
+    report_path.write_text(format_report(report, config), encoding="utf-8")
     low, high = solid.bounds
     size = high - low
     print(
@@ -120,6 +119,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         f" volume {solid.volume() / 1000:.1f} cm^3"
     )
     print(f"STL:     {stl_path} ({config.output.stl_units})")
+    print(f"Report:  {report_path}")
+    print(
+        f"Milling: ~{report.finishing_minutes:.0f} min finishing pass,"
+        f" {report.unreachable_fraction:.1%} of the part finer than the cutter"
+    )
 
     if config.output.preview:
         try:

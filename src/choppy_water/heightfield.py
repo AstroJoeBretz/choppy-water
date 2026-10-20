@@ -174,10 +174,16 @@ class Heightfield:
         return values.reshape(shape)
 
 
-def _axis(half_extent: float, spacing: float) -> np.ndarray:
-    """Symmetric axis through 0 that covers ``[-half_extent, half_extent]`` plus a margin."""
-    count = math.ceil(half_extent / spacing) + 1
+def _axis(half_extent: float, spacing: float, margin_cells: int) -> np.ndarray:
+    """Symmetric axis through 0 covering ``[-half_extent, half_extent]`` plus a margin."""
+    count = math.ceil(half_extent / spacing) + margin_cells
     return np.arange(-count, count + 1) * spacing
+
+
+def slope_degrees(z: np.ndarray, spacing: float) -> np.ndarray:
+    """Surface inclination from horizontal at every grid point (0 = flat, 90 = vertical)."""
+    slope_y, slope_x = np.gradient(z, spacing)
+    return np.degrees(np.arctan(np.hypot(slope_x, slope_y)))
 
 
 def warp_surface(
@@ -210,8 +216,12 @@ def generate_heightfield(config: Config) -> Heightfield:
 
     field = make_wave_field(water, spacing)  # first: rejects oversized FFT grids cheaply
 
+    # Pad the grid by the cutter radius so the tool-reach filter sees real surface (not an
+    # artificial edge) right up to the outline.
+    margin = math.ceil(cfg.milling.tool_diameter / 2 / spacing) + 2
     width, height = part.extent
-    x_axis, y_axis = _axis(width / 2, spacing), _axis(height / 2, spacing)
+    x_axis = _axis(width / 2, spacing, margin)
+    y_axis = _axis(height / 2, spacing, margin)
     gx, gy = np.meshgrid(x_axis, y_axis)
     mask = footprint_mask(part, gx, gy)
 
@@ -230,11 +240,9 @@ def generate_heightfield(config: Config) -> Heightfield:
     low, high = h[mask].min(), h[mask].max()
     z = part.base_thickness + (h - low) / (high - low) * water.relief
 
-    slope_y, slope_x = np.gradient(z, spacing)
-    max_slope = float(np.degrees(np.arctan(np.hypot(slope_x, slope_y)[mask].max())))
     stats = SurfaceStats(
         relief=float(np.ptp(z[mask])),
-        max_slope_deg=max_slope,
+        max_slope_deg=float(slope_degrees(z, spacing)[mask].max()),
         unresolved_fraction=float(np.mean(residual[mask] > tolerance)),
         iterations=iterations,
     )

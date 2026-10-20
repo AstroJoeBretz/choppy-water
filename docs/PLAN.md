@@ -41,7 +41,7 @@ src/choppy_water/
   mesh.py                 disc and rectangle solids, watertight check
   stl_io.py               binary STL writer/reader
   record.py               JSON run record next to the STL
-  milling.py              (Phase 3)
+  milling.py              tool-reach filter (closing), slope/stock checks, report
   preview.py              (Phase 1, optional matplotlib)
 tests/
 examples/
@@ -55,7 +55,7 @@ examples/
 | 0. Scaffold (done) | Repo, `pyproject.toml`, config loader + validation (disc or rect), CLI skeleton, CI, license | `pytest` and `ruff` pass; bad configs give clear errors |
 | 1. Heightfield (done) | Spectrum, FFT height field, choppiness, relief normalization, PNG preview | Same seed gives same surface; preview looks like choppy water |
 | 2. Solid and STL (done) | Disc and rectangle meshes, flat bottom, walls, binary STL, unit handling | Watertight, outward normals, correct volume and bounding box for both shapes |
-| 3. Milling awareness | Tool-reachability filter, slope/stock checks, report | Warns or fixes features the cutter cannot make |
+| 3. Milling awareness (done) | Tool-reachability filter, slope/stock checks, report | Warns or fixes features the cutter cannot make |
 | 4. Polish, v0.1 | README gallery, presets, docs, ~80% coverage | A stranger gets an STL in three commands |
 | 5. Stretch | Time parameter, rim/bevel, rect corner radius, G-code, GUI | Optional |
 

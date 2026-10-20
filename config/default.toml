@@ -1,0 +1,51 @@
+# choppy-water default configuration.
+#
+# Every length in this file is in the unit given by [units].length ("in" or "mm"),
+# including feed rates (length per minute). Angles are in degrees.
+# Copy this file, edit it, and run:  choppy-water --config my_config.toml
+
+[units]
+length = "in"                # "in" | "mm"
+
+[part]
+# Outline of the finished piece.
+shape          = "disc"      # "disc" | "rect"
+diameter       = 3.0         # used when shape = "disc"
+width          = 4.0         # X size, used when shape = "rect"
+length         = 3.0         # Y size, used when shape = "rect"
+base_thickness = 0.25        # material left under the deepest trough
+max_thickness  = 0.50        # height of the highest crest; must be <= milling.stock_thickness
+
+[water]
+method              = "fft"  # "fft" | "gerstner"
+seed                = 42
+patch_size          = 6.0    # simulated area (square); keep >= the part's largest dimension
+wavelength_dominant = 0.8
+wavelength_min      = 0.3
+wavelength_max      = 1.6
+wind_direction_deg  = 0.0
+directional_spread_deg = 40.0
+choppiness          = 1.0    # 0 = rounded swells; higher = sharper crests
+relief              = 0.25   # peak-to-peak height; must be <= max_thickness - base_thickness
+smoothing           = 0.0    # Gaussian blur radius applied to the finished surface
+
+[mesh]
+grid_spacing  = 0.01         # surface sample spacing
+edge_segments = 720          # boundary points around a disc (ignored for rect)
+
+[milling]
+stock_thickness     = 1.0
+tool_type           = "ball" # "ball"
+tool_diameter       = 0.125
+max_slope_deg       = 70.0   # steepest surface the tool can plausibly follow
+enforce_tool_limits = true   # fill valleys narrower than the cutter so the STL matches the cut
+stepover_pct        = 10.0   # percent of tool diameter
+stepdown            = 0.1
+feed_rate           = 60.0   # length per minute
+plunge_rate         = 20.0   # length per minute
+spindle_rpm         = 16000
+
+[output]
+stl_path  = "output/choppy_water.stl"
+stl_units = "mm"             # "mm" | "in"; most CAM tools assume mm
+preview   = true

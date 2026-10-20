@@ -192,3 +192,80 @@ def test_load_config_errors(tmp_path):
 
 def test_load_config_without_path_gives_defaults():
     assert load_config() == Config()
+
+
+# -- optional chop layer ([water.chop]) -----------------------------------------------------
+
+
+def with_chop(**chop):
+    return Config.from_dict({"water": {"relief": 0.15, "chop": chop}})
+
+
+def test_no_chop_layer_by_default():
+    cfg = Config()
+    assert cfg.chop is None
+    assert len(cfg.wave_layers()) == 1
+    assert "chop" not in cfg.to_dict()["water"]
+    assert cfg.total_relief == cfg.water.relief
+
+
+def test_chop_layer_defaults_and_derived_seed():
+    cfg = Config.from_dict({"water": {"seed": 9, "relief": 0.15, "chop": {}}})
+    main, chop = cfg.wave_layers()
+    assert chop.seed == 10  # water.seed + 1
+    assert chop.patch_size == main.patch_size
+    assert chop.wavelength_dominant < main.wavelength_dominant
+    assert cfg.total_relief == pytest.approx(0.15 + cfg.chop.relief)
+
+
+def test_explicit_chop_seed_is_respected():
+    assert with_chop(seed=3).wave_layers()[1].seed == 3
+
+
+def test_chop_roundtrips_through_to_dict():
+    for cfg in (Config(), with_chop(relief=0.05, choppiness=0.4)):
+        assert Config.from_dict(cfg.to_dict()) == cfg
+    assert with_chop(relief=0.05).to_dict()["water"]["chop"]["relief"] == 0.05
+
+
+def test_chop_errors_name_the_table():
+    with pytest.raises(ConfigError, match="water.chop.reliev: unknown key.*relief"):
+        with_chop(reliev=0.1)
+    with pytest.raises(ConfigError, match="water.chop.relief: expected float"):
+        with_chop(relief="lots")
+    with pytest.raises(ConfigError, match="water.chop.wavelength_max"):
+        with_chop(wavelength_max=9.0)
+    with pytest.raises(ConfigError, match="water.chop.choppiness"):
+        with_chop(choppiness=-1)
+
+
+def test_layers_must_share_the_thickness_budget():
+    with pytest.raises(ConfigError, match=r"water.relief \+ water.chop.relief"):
+        Config.from_dict({"water": {"relief": 0.2, "chop": {"relief": 0.1}}})
+    Config.from_dict({"water": {"relief": 0.17, "chop": {"relief": 0.08}}})
+
+
+def test_chop_lengths_scale_to_mm():
+    mm = with_chop(relief=0.05, wavelength_min=0.2).to_mm()
+    assert mm.chop.relief == pytest.approx(0.05 * MM_PER_INCH)
+    assert mm.chop.wavelength_min == pytest.approx(0.2 * MM_PER_INCH)
+    assert mm.wave_layers()[1].patch_size == pytest.approx(6.0 * MM_PER_INCH)
+
+
+def test_chop_warns_about_ripples_finer_than_the_cutter():
+    cfg = with_chop(wavelength_min=0.1, wavelength_dominant=0.3, relief=0.05)
+    assert any("water.chop.wavelength_min" in n for n in cfg.warnings())
+
+
+def test_nested_overrides_create_and_edit_the_chop_layer():
+    assert parse_override("water.chop.relief=0.05") == ("water", "chop.relief", 0.05)
+    cfg = load_config(None, ["water.relief=0.15", "water.chop.relief=0.05"])
+    assert cfg.chop.relief == 0.05
+    cfg = load_config(None, ["water.relief=0.15", "water.chop.relief=0.05", "water.chop.seed=4"])
+    assert cfg.chop.seed == 4
+
+
+def test_chop_table_in_a_toml_file(tmp_path):
+    path = tmp_path / "c.toml"
+    path.write_text("[water]\nrelief = 0.15\n[water.chop]\nrelief = 0.07\n", encoding="utf-8")
+    assert load_config(path).chop.relief == 0.07

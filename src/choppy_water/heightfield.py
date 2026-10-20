@@ -211,12 +211,36 @@ def warp_surface(
     return field.height(x0, y0), residual, iterations
 
 
-def generate_heightfield(config: Config) -> Heightfield:
-    """Synthesize the choppy-water thickness map for ``config`` (any length unit)."""
-    cfg = config.to_mm()
-    part, water, spacing = cfg.part, cfg.water, cfg.mesh.grid_spacing
+def _layer_heights(
+    field: WaveField, layer: Water, gx: np.ndarray, gy: np.ndarray, mask: np.ndarray, tol: float
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """One wave layer on the grid, scaled so its peak-to-peak height over the part is ``relief``.
 
-    field = make_wave_field(water, spacing)  # first: rejects oversized FFT grids cheaply
+    The field's own amplitude is arbitrary. Displacement is scaled by the gain that gives the
+    requested relief, so `choppiness` means the same thing for every seed and spectrum.
+    """
+    spread = np.ptp(field.height(gx, gy)[mask])
+    if spread <= 0:
+        raise ValueError("wave field is flat over the part; check the water settings")
+    gain = layer.relief / spread
+    h, residual, iterations = warp_surface(field, gx, gy, layer.choppiness * gain, tolerance=tol)
+    # Warping shifts the extremes slightly, so renormalize to exactly `relief` over the part.
+    low, high = h[mask].min(), h[mask].max()
+    return (h - low) / (high - low) * layer.relief, residual > tol, iterations
+
+
+def generate_heightfield(config: Config) -> Heightfield:
+    """Synthesize the choppy-water thickness map for ``config`` (any length unit).
+
+    Each wave layer (the main sea, plus the optional ``[water.chop]`` layer) is generated and
+    choppy-warped on its own, so sharp chop stays sharp, then the layers are summed.
+    """
+    cfg = config.to_mm()
+    part, spacing = cfg.part, cfg.mesh.grid_spacing
+    layers = cfg.wave_layers()
+
+    # First: building every field rejects oversized FFT grids before the big arrays exist.
+    fields = [make_wave_field(layer, spacing) for layer in layers]
 
     # Pad the grid by the cutter radius so the tool-reach filter sees real surface (not an
     # artificial edge) right up to the outline.
@@ -227,25 +251,25 @@ def generate_heightfield(config: Config) -> Heightfield:
     gx, gy = np.meshgrid(x_axis, y_axis)
     mask = footprint_mask(part, gx, gy)
 
-    # The field's amplitude is arbitrary. Scale displacement by the gain that would give the
-    # requested relief, so `choppiness` means the same thing for every seed and spectrum.
-    spread = np.ptp(field.height(gx, gy)[mask])
-    if spread <= 0:
-        raise ValueError("wave field is flat over the part; check the water settings")
-    gain = water.relief / spread
-
     tolerance = 0.05 * spacing
-    h, residual, iterations = warp_surface(
-        field, gx, gy, water.choppiness * gain, tolerance=tolerance
-    )
-    # Warping shifts the extremes slightly, so renormalize to exactly `relief` over the part.
-    low, high = h[mask].min(), h[mask].max()
-    z = part.base_thickness + (h - low) / (high - low) * water.relief
+    total = np.zeros_like(gx)
+    unresolved = np.zeros(gx.shape, dtype=bool)
+    iterations = 0
+    for layer, wave_field in zip(layers, fields, strict=True):
+        h, folded, used = _layer_heights(wave_field, layer, gx, gy, mask, tolerance)
+        total += h
+        unresolved |= folded
+        iterations = max(iterations, used)
+
+    # Layer peaks rarely line up, so the sum is a little under the budget; stretch it to
+    # exactly the combined relief so the part uses the thickness it was given.
+    low, high = total[mask].min(), total[mask].max()
+    z = part.base_thickness + (total - low) / (high - low) * cfg.total_relief
 
     stats = SurfaceStats(
         relief=float(np.ptp(z[mask])),
         max_slope_deg=float(slope_degrees(z, spacing)[mask].max()),
-        unresolved_fraction=float(np.mean(residual[mask] > tolerance)),
+        unresolved_fraction=float(np.mean(unresolved[mask])),
         iterations=iterations,
     )
     return Heightfield(x=x_axis, y=y_axis, z=z, spacing=spacing, mask=mask, stats=stats)

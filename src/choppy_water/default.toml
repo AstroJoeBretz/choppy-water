@@ -29,6 +29,23 @@ choppiness          = 0.8    # 0 = rounded swells; ~1 = cusped crests; much abov
 relief              = 0.25   # peak-to-peak height; must be <= max_thickness - base_thickness
 smoothing           = 0.0    # Gaussian low-pass radius applied to the waves
 
+# Optional second layer: short, sharp chop riding on top of the waves above. Uncomment to enable.
+# It is generated and choppy-warped separately, then added. The reliefs of both layers add up and
+# must together be <= max_thickness - base_thickness, so lower relief above to make room:
+# with the default budget, relief = 0.17 above plus the 0.08 chop below fits exactly.
+# It shares water.patch_size; every other key may be omitted to take the value shown here.
+# [water.chop]
+# method                 = "fft"
+# seed                   = -1     # -1 means water.seed + 1
+# wavelength_dominant    = 0.5
+# wavelength_min         = 0.25
+# wavelength_max         = 0.9
+# wind_direction_deg     = 0.0
+# directional_spread_deg = 70.0
+# choppiness             = 0.9
+# relief                 = 0.08
+# smoothing              = 0.0
+
 [mesh]
 grid_spacing  = 0.01         # surface sample spacing
 edge_segments = 720          # boundary points around a disc (ignored for rect)

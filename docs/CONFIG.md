@@ -38,8 +38,33 @@ All lengths use `units.length`, including feed rates (length per minute). Angles
 | `water.wind_direction_deg` | `0.0` | Direction the waves travel, from the +X axis. Crests run perpendicular to it. |
 | `water.directional_spread_deg` | `40.0` | How scattered the wave directions are: small = tidy parallel swells, large = chaotic sea. |
 | `water.choppiness` | `0.8` | `0` = rounded swells; around `1` = pointed crests; much above `1` folds the surface over itself (the tool reports this). |
-| `water.relief` | `0.25` | Peak-to-peak height of the waves over the part. Must fit within `max_thickness - base_thickness`. |
+| `water.relief` | `0.25` | Peak-to-peak height of this layer over the part. With a chop layer, both reliefs together must fit within `max_thickness - base_thickness`. |
 | `water.smoothing` | `0.0` | Gaussian low-pass radius applied to the waves. |
+
+## `[water.chop]`: optional second layer
+
+Add this table for a composite sea: long, calm swells from `[water]` with short, sharp chop on top.
+Each layer is generated and choppy-warped on its own (so the chop keeps its sharp crests), then the
+two are added. Leave the table out and nothing changes. Any key you omit takes the default below. It shares `water.patch_size`. The two reliefs add up
+and must fit the thickness budget, so lower `water.relief` to make room: with the default 0.25 in
+budget, `water.relief = 0.17` plus the default chop relief of 0.08 fits exactly. Command-line form:
+`--set water.chop.relief=0.08`.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `water.chop.method` | `"fft"` | `"fft"` or `"gerstner"`, as for `water.method`. |
+| `water.chop.seed` | `-1` | `-1` means `water.seed + 1`, so the chop is a different pattern from the swell. |
+| `water.chop.wavelength_dominant` | `0.5` | Most prominent chop wavelength. |
+| `water.chop.wavelength_min` | `0.25` | Shortest ripple. Keep it at least twice `milling.tool_diameter`. |
+| `water.chop.wavelength_max` | `0.9` | Longest chop wavelength. Must not exceed `water.patch_size`. |
+| `water.chop.wind_direction_deg` | `0.0` | Direction the chop travels. |
+| `water.chop.directional_spread_deg` | `70.0` | Direction scatter; chop is usually less orderly than swell. |
+| `water.chop.choppiness` | `0.9` | Sharpness of the chop crests. |
+| `water.chop.relief` | `0.08` | Peak-to-peak height of the chop layer. |
+| `water.chop.smoothing` | `0.0` | Gaussian low-pass radius applied to the chop. |
+
+The combined surface is stretched to the total relief (`water.relief + water.chop.relief`), because
+the crests of the two layers rarely coincide.
 
 ## `[mesh]`: resolution
 

@@ -46,6 +46,39 @@ def test_documented_defaults_match_the_code():
                 assert float(shown) == pytest.approx(float(value)), (section, key)
 
 
+def test_chop_layer_is_documented_with_matching_defaults():
+    import dataclasses
+
+    from choppy_water.config import ChopLayer
+
+    doc = (ROOT / "docs" / "CONFIG.md").read_text(encoding="utf-8")
+    rows = dict(re.findall(r"\| `(water\.chop\.[a-z_]+)` \| `([^`]+)` \|", doc))
+    defaults = ChopLayer()
+    assert set(rows) == {f"water.chop.{f.name}" for f in dataclasses.fields(ChopLayer)}
+    for field in dataclasses.fields(ChopLayer):
+        shown, value = rows[f"water.chop.{field.name}"], getattr(defaults, field.name)
+        if isinstance(value, str):
+            assert shown == f'"{value}"'
+        else:
+            assert float(shown) == pytest.approx(float(value)), field.name
+
+
+def test_default_toml_shows_the_chop_block_with_the_real_defaults():
+    from choppy_water.config import ChopLayer
+
+    lines = default_config_text().splitlines()
+    start = lines.index("# [water.chop]")
+    block = []
+    for line in lines[start:]:
+        if not line.startswith("# "):
+            break
+        block.append(line[2:].split("#")[0].rstrip())  # uncomment, drop inline comments
+    # The swell must make room for the chop, as the comment in the file says.
+    text = "[water]\nrelief = 0.17\n" + "\n".join(block)
+    cfg = Config.from_dict(tomllib.loads(text))
+    assert cfg.chop == ChopLayer()
+
+
 def test_there_is_at_least_a_calm_a_choppy_and_a_stormy_preset():
     assert {"calm", "choppy", "stormy"} <= {p.stem for p in EXAMPLES}
 

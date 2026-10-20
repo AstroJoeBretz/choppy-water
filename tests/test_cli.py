@@ -19,6 +19,12 @@ def test_check_with_default_toml_file():
     assert main(["--config", str(DEFAULT_TOML), "--check"]) == 0
 
 
+def test_chop_layer_shows_in_the_summary(capsys):
+    args = ["--check", "--set", "water.relief=0.15", "--set", "water.chop.relief=0.06"]
+    assert main(args) == 0
+    assert "Chop:    method fft, relief 0.06 in" in capsys.readouterr().out
+
+
 def test_rect_override(capsys):
     code = main(["--check", "--set", "part.shape=rect", "--set", "part.width=5"])
     assert code == 0

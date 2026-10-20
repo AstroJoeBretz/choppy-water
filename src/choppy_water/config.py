@@ -25,6 +25,7 @@ LENGTH_UNITS = ("in", "mm")
 SHAPES = ("disc", "rect")
 WATER_METHODS = ("fft", "gerstner")
 TOOL_TYPES = ("ball",)
+LAYER_NAMES = ("water", "water.chop")
 
 
 def _length(default: float) -> Any:
@@ -74,6 +75,25 @@ class Water:
     directional_spread_deg: float = 40.0
     choppiness: float = 0.8
     relief: float = _length(0.25)
+    smoothing: float = _length(0.0)
+
+
+@dataclass(frozen=True)
+class ChopLayer:
+    """Optional second wave layer (``[water.chop]``): shorter, sharper waves on the swell.
+
+    Shares ``water.patch_size``. ``seed = -1`` means ``water.seed + 1``.
+    """
+
+    method: str = "fft"
+    seed: int = -1
+    wavelength_dominant: float = _length(0.5)
+    wavelength_min: float = _length(0.25)
+    wavelength_max: float = _length(0.9)
+    wind_direction_deg: float = 0.0
+    directional_spread_deg: float = 70.0
+    choppiness: float = 0.9
+    relief: float = _length(0.08)
     smoothing: float = _length(0.0)
 
 
@@ -160,6 +180,7 @@ class Config:
     units: Units = field(default_factory=Units)
     part: Part = field(default_factory=Part)
     water: Water = field(default_factory=Water)
+    chop: ChopLayer | None = None  # TOML: the [water.chop] table
     mesh: Mesh = field(default_factory=Mesh)
     milling: Milling = field(default_factory=Milling)
     output: Output = field(default_factory=Output)
@@ -175,11 +196,20 @@ class Config:
                 close = difflib.get_close_matches(key, _SECTIONS, n=1)
                 hint = f" (did you mean '[{close[0]}]'?)" if close else ""
                 errors.append(f"[{key}]: unknown section{hint}")
+        raw = dict(raw)
+        chop_raw = None
+        if isinstance(raw.get("water"), Mapping) and "chop" in raw["water"]:
+            water_raw = dict(raw["water"])
+            chop_raw = water_raw.pop("chop")
+            raw["water"] = water_raw
         sections = {
             name: _build_section(section_cls, raw[name], name, errors) if name in raw else None
             for name, section_cls in _SECTIONS.items()
         }
-        config = cls(**{k: v for k, v in sections.items() if v is not None})
+        kwargs = {k: v for k, v in sections.items() if v is not None}
+        if chop_raw is not None:
+            kwargs["chop"] = _build_section(ChopLayer, chop_raw, "water.chop", errors)
+        config = cls(**kwargs)
         if not errors:  # semantic checks assume correctly typed values
             errors.extend(config.validate())
         if errors:
@@ -187,7 +217,27 @@ class Config:
         return config
 
     def to_dict(self) -> dict[str, dict[str, Any]]:
-        return dataclasses.asdict(self)
+        """Plain dict in TOML layout (``chop`` nested under ``water``); feeds ``from_dict``."""
+        data = dataclasses.asdict(self)
+        chop = data.pop("chop")
+        if chop is not None:
+            data["water"]["chop"] = chop
+        return data
+
+    def wave_layers(self) -> list[Water]:
+        """The wave layers to synthesize: the main sea, then the chop layer if configured."""
+        layers = [self.water]
+        if self.chop is not None:
+            values = {f.name: getattr(self.chop, f.name) for f in fields(ChopLayer)}
+            if values["seed"] == -1:
+                values["seed"] = self.water.seed + 1
+            layers.append(Water(**values, patch_size=self.water.patch_size))
+        return layers
+
+    @property
+    def total_relief(self) -> float:
+        """Combined peak-to-peak height budget of all wave layers."""
+        return sum(layer.relief for layer in self.wave_layers())
 
     # -- units ----------------------------------------------------------------------------
 
@@ -208,13 +258,22 @@ class Config:
             }
             changes[name] = dataclasses.replace(section, **scaled)
         changes["units"] = Units(length="mm")
+        if self.chop is not None:
+            changes["chop"] = dataclasses.replace(
+                self.chop,
+                **{
+                    f.name: getattr(self.chop, f.name) * scale
+                    for f in fields(ChopLayer)
+                    if f.metadata.get("length")
+                },
+            )
         return dataclasses.replace(self, **changes)
 
     # -- validation -----------------------------------------------------------------------
 
     def validate(self) -> list[str]:
         """Return a list of error messages (empty when the config is usable)."""
-        p, w, m, ml, o = self.part, self.water, self.mesh, self.milling, self.output
+        p, m, ml, o = self.part, self.mesh, self.milling, self.output
         errors: list[str] = []
 
         def need(ok: bool, message: str) -> None:
@@ -236,28 +295,33 @@ class Config:
             "part.max_thickness: must not exceed milling.stock_thickness",
         )
 
-        need(w.method in WATER_METHODS, f"water.method: must be one of {WATER_METHODS}")
-        need(w.patch_size > 0, "water.patch_size: must be > 0")
-        need(w.wavelength_min > 0, "water.wavelength_min: must be > 0")
+        for name, layer in zip(LAYER_NAMES, self.wave_layers(), strict=False):
+            need(layer.method in WATER_METHODS, f"{name}.method: must be one of {WATER_METHODS}")
+            need(layer.patch_size > 0, f"{name}.patch_size: must be > 0")
+            need(layer.wavelength_min > 0, f"{name}.wavelength_min: must be > 0")
+            need(
+                layer.wavelength_min <= layer.wavelength_dominant <= layer.wavelength_max,
+                f"{name}: need wavelength_min <= wavelength_dominant <= wavelength_max",
+            )
+            need(
+                layer.wavelength_max <= layer.patch_size,
+                f"{name}.wavelength_max: must not exceed water.patch_size",
+            )
+            need(
+                0 <= layer.directional_spread_deg <= 180,
+                f"{name}.directional_spread_deg: must be between 0 and 180",
+            )
+            need(layer.choppiness >= 0, f"{name}.choppiness: must be >= 0")
+            need(layer.relief > 0, f"{name}.relief: must be > 0")
+            need(layer.smoothing >= 0, f"{name}.smoothing: must be >= 0")
+            need(layer.seed >= 0, f"{name}.seed: must be >= 0")
+        if self.chop is not None:
+            need(self.chop.seed >= -1, "water.chop.seed: must be >= 0 (or -1 for water.seed + 1)")
+        label = "water.relief + water.chop.relief" if self.chop is not None else "water.relief"
         need(
-            w.wavelength_min <= w.wavelength_dominant <= w.wavelength_max,
-            "water: need wavelength_min <= wavelength_dominant <= wavelength_max",
+            self.total_relief <= p.max_thickness - p.base_thickness,
+            f"{label}: must fit within max_thickness - base_thickness",
         )
-        need(
-            w.wavelength_max <= w.patch_size,
-            "water.wavelength_max: must not exceed patch_size",
-        )
-        need(
-            0 <= w.directional_spread_deg <= 180,
-            "water.directional_spread_deg: must be between 0 and 180",
-        )
-        need(w.choppiness >= 0, "water.choppiness: must be >= 0")
-        need(w.relief > 0, "water.relief: must be > 0")
-        need(
-            w.relief <= p.max_thickness - p.base_thickness,
-            "water.relief: must fit within max_thickness - base_thickness",
-        )
-        need(w.smoothing >= 0, "water.smoothing: must be >= 0")
 
         need(m.grid_spacing > 0, "mesh.grid_spacing: must be > 0")
         need(m.edge_segments >= 16, "mesh.edge_segments: must be >= 16")
@@ -280,14 +344,17 @@ class Config:
         """Return non-fatal advisories about settings that are legal but probably unwise."""
         p, w, m, ml = self.part, self.water, self.mesh, self.milling
         notes: list[str] = []
+        layers = list(zip(LAYER_NAMES, self.wave_layers(), strict=False))
         if w.patch_size < max(p.extent):
             notes.append(
                 "water.patch_size is smaller than the part: the wave pattern will visibly repeat"
             )
-        if m.grid_spacing > w.wavelength_min / 10:
-            notes.append(
-                "mesh.grid_spacing is coarse for wavelength_min (< 10 samples per wavelength)"
-            )
+        for name, layer in layers:
+            if m.grid_spacing > layer.wavelength_min / 10:
+                notes.append(
+                    f"mesh.grid_spacing is coarse for {name}.wavelength_min "
+                    "(< 10 samples per wavelength)"
+                )
         if p.shape == "disc":
             ring_spacing = math.pi * p.diameter / m.edge_segments
             if not 0.5 * m.grid_spacing <= ring_spacing <= 2 * m.grid_spacing:
@@ -300,11 +367,12 @@ class Config:
                 "mesh.grid_spacing is coarse relative to milling.tool_diameter "
                 "(< 10 cells across the cutter): tool-reach estimates will be unreliable"
             )
-        if ml.enforce_tool_limits and w.wavelength_min < 2 * ml.tool_diameter:
-            notes.append(
-                "water.wavelength_min < 2 x tool_diameter: the finest ripples will be smoothed "
-                "out by the cutter"
-            )
+        for name, layer in layers:
+            if ml.enforce_tool_limits and layer.wavelength_min < 2 * ml.tool_diameter:
+                notes.append(
+                    f"{name}.wavelength_min < 2 x tool_diameter: the finest ripples will be "
+                    "smoothed out by the cutter"
+                )
         return notes
 
 
@@ -345,5 +413,11 @@ def load_config(path: str | Path | None = None, overrides: Sequence[str] = ()) -
         table = raw.setdefault(section, {})
         if not isinstance(table, dict):
             raise ConfigError([f"override '{text}': [{section}] is not a table"])
+        sub, dot, leaf = key.partition(".")  # e.g. water.chop.relief
+        if dot:
+            table = table.setdefault(sub, {})
+            if not isinstance(table, dict):
+                raise ConfigError([f"override '{text}': {section}.{sub} is not a table"])
+            key = leaf
         table[key] = value
     return Config.from_dict(raw)

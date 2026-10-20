@@ -63,6 +63,15 @@ def describe(config: Config) -> str:
             f" (stock {ml.stock_thickness:g} {u})",
             f"Water:   method {w.method}, seed {w.seed}, relief {w.relief:g} {u},"
             f" choppiness {w.choppiness:g}",
+            *(
+                [
+                    f"Chop:    method {c.method}, relief {c.relief:g} {u},"
+                    f" choppiness {c.choppiness:g}, wavelengths {c.wavelength_min:g}"
+                    f" to {c.wavelength_max:g} {u}"
+                ]
+                if (c := config.chop) is not None
+                else []
+            ),
             f"Tool:    {ml.tool_type} nose, {ml.tool_diameter:g} {u} diameter",
             f"Output:  {config.output.stl_path} ({config.output.stl_units})",
         ]

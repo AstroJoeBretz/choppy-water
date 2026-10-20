@@ -3,6 +3,17 @@
 All notable changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- Optional `[water.chop]` layer: a second wave layer (own wavelengths, relief, choppiness,
+  direction spread, seed) added on top of the main sea for composite swell-and-chop surfaces.
+  `--set water.chop.relief=...` works from the command line. New `swell_and_chop` example.
+
+### Changed
+- `water.relief` is now the budget of its own layer; with a chop layer the reliefs add up and
+  must together fit within `max_thickness - base_thickness`.
+
 ## [0.1.0] - 2026-10-19
 
 First release.

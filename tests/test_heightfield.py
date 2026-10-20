@@ -163,3 +163,66 @@ def test_gerstner_field_is_seeded():
     c = GerstnerWaveField(water, np.random.default_rng(2)).height(pts, pts)
     assert np.array_equal(a, b)
     assert not np.allclose(a, c)
+
+
+# -- optional chop layer ------------------------------------------------------------------------
+
+CHOP = ["water.relief=0.17", "water.chop.relief=0.08"]
+
+
+def smooth(z, sigma):
+    from scipy import ndimage
+
+    return ndimage.gaussian_filter(z, sigma)
+
+
+def test_chop_layer_uses_the_whole_budget_and_stays_in_stock():
+    cfg = make(*CHOP)
+    hf = generate_heightfield(cfg)
+    z = hf.z[hf.mask]
+    assert z.min() == pytest.approx(cfg.part.base_thickness * MM)
+    assert np.ptp(z) == pytest.approx(cfg.total_relief * MM)
+    assert z.max() <= cfg.part.max_thickness * MM + 1e-9
+
+
+def test_chop_layer_is_deterministic_and_has_its_own_seed():
+    a = generate_heightfield(make(*CHOP)).z
+    assert np.array_equal(a, generate_heightfield(make(*CHOP)).z)
+    same_seed = generate_heightfield(make(*CHOP, "water.chop.seed=42")).z  # = water.seed
+    assert not np.allclose(a, same_seed)
+
+
+SWELL = [
+    "water.wavelength_dominant=2.0",
+    "water.wavelength_min=1.2",
+    "water.wavelength_max=4.0",
+    "water.directional_spread_deg=20",
+    "water.choppiness=0.2",
+]
+
+
+def test_chop_adds_fine_detail_on_top_of_the_swell():
+    swell_only = generate_heightfield(make(*SWELL, "water.relief=0.17"))
+    with_chop = generate_heightfield(make(*SWELL, *CHOP))
+    sigma = 3  # px of 1 mm: well above the chop wavelengths (>= 6 mm), below the swell's
+
+    def roughness(hf):
+        return float(np.abs(hf.z - smooth(hf.z, sigma))[hf.mask].mean())
+
+    assert roughness(with_chop) > 2 * roughness(swell_only)
+    # The swell is still there: the large-scale shape correlates with the swell-only surface.
+    a = smooth(with_chop.z, sigma * 2)[with_chop.mask]
+    b = smooth(swell_only.z, sigma * 2)[swell_only.mask]
+    assert np.corrcoef(a, b)[0, 1] > 0.8
+
+
+def test_chop_layer_works_for_gerstner_and_rect():
+    cfg = make(*CHOP, "water.chop.method='gerstner'", "part.shape='rect'")
+    hf = generate_heightfield(cfg)
+    assert np.ptp(hf.z[hf.mask]) == pytest.approx(cfg.total_relief * MM)
+
+
+def test_fold_report_covers_the_chop_layer():
+    folded = generate_heightfield(make(*CHOP, "water.chop.choppiness=4")).stats
+    assert folded.unresolved_fraction > 0.05
+    assert generate_heightfield(make(*CHOP)).stats.unresolved_fraction < 0.02

@@ -153,14 +153,14 @@ def _surface_for(part: Part, spacing: float, edge_segments: int) -> _Surface:
 def build_solid(config: Config, heightfield: Heightfield) -> Solid:
     """Close the heightfield into a printable/millable solid (millimetres)."""
     cfg = config.to_mm()
-    part, water = cfg.part, cfg.water
+    part = cfg.part
     surface = _surface_for(part, cfg.mesh.grid_spacing, cfg.mesh.edge_segments)
 
     # Cubic sampling can overshoot a crest by a hair; clamp so the part stays inside its stock.
     top_z = np.clip(
         heightfield.sample(surface.xy[:, 0], surface.xy[:, 1], method="cubic"),
         part.base_thickness,
-        part.base_thickness + water.relief,
+        part.base_thickness + cfg.total_relief,
     )
     n_top = len(surface.xy)
     top = np.column_stack([surface.xy, top_z])

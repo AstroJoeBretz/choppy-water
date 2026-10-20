@@ -8,6 +8,10 @@ model and milling parameter lives in one TOML config file.
 |:---:|:---:|:---:|:---:|
 | ![calm](docs/images/calm.png) | ![choppy](docs/images/choppy.png) | ![stormy](docs/images/stormy.png) | ![plaque](docs/images/plaque.png) |
 
+| Swell and chop |
+|:---:|
+| ![swell and chop](docs/images/swell_and_chop.png) |
+
 *Shaded previews written by the tool. Presets live in [examples/](examples/).*
 
 ## Features
@@ -15,6 +19,7 @@ model and milling parameter lives in one TOML config file.
 - Disc (diameter) or rectangle (width x length) outlines; inches or millimetres.
 - Realistic random seas (FFT wave spectrum) or simple Gerstner waves, with a choppiness control
   for sharp crests. Same seed, same surface.
+- Optional second wave layer: calm swells with sharp chop riding on top (`[water.chop]`).
 - Watertight, correctly oriented binary STL with a flat bottom, ready for CAM.
 - Knows about the cutter: valleys narrower than your ball nose are filled in the model so it
   matches what you can actually cut, and a report gives slope, scallop height, time and layers.

@@ -34,7 +34,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="override a config value, e.g. --set water.choppiness=1.4 (repeatable)",
     )
     parser.add_argument("--seed", type=int, help="shortcut for --set water.seed=N")
-    parser.add_argument("-o", "--output", help="shortcut for --set output.stl_path=PATH")
+    parser.add_argument(
+        "-o",
+        "--output",
+        metavar="DIR",
+        help="parent folder for results (shortcut for --set output.directory=DIR); "
+        "files go in DIR/<config name>/. Default: output",
+    )
     parser.add_argument("--check", action="store_true", help="validate the configuration and exit")
     parser.add_argument(
         "--show-config", action="store_true", help="print the resolved configuration as JSON"
@@ -48,7 +54,22 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def describe(config: Config) -> str:
+DEFAULT_RUN_NAME = "choppy_water"
+
+
+def resolve_stl_path(config: Config, config_path: str | Path | None) -> Path:
+    """Where the STL goes: ``output.stl_path`` if set, else ``<directory>/<name>/<name>.stl``.
+
+    ``name`` is the config file's name without extension (``choppy_water`` with no file), so
+    each config gets its own folder holding the STL, preview, report and run record.
+    """
+    if config.output.stl_path:
+        return Path(config.output.stl_path)
+    name = Path(config_path).stem if config_path else DEFAULT_RUN_NAME
+    return Path(config.output.directory) / name / f"{name}.stl"
+
+
+def describe(config: Config, stl_path: Path) -> str:
     """One-screen human summary of what the config describes."""
     u = config.units.length
     p, w, ml = config.part, config.water, config.milling
@@ -73,7 +94,7 @@ def describe(config: Config) -> str:
                 else []
             ),
             f"Tool:    {ml.tool_type} nose, {ml.tool_diameter:g} {u} diameter",
-            f"Output:  {config.output.stl_path} ({config.output.stl_units})",
+            f"Output:  {stl_path} ({config.output.stl_units})",
         ]
     )
 
@@ -93,7 +114,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.seed is not None:
         overrides.append(f"water.seed={args.seed}")
     if args.output is not None:
-        overrides.append(f"output.stl_path={json.dumps(args.output)}")
+        if args.output.lower().endswith(".stl"):
+            print(
+                "error: -o now takes a folder, and results go in a subfolder named after the "
+                "config. For an exact file use --set output.stl_path=PATH",
+                file=sys.stderr,
+            )
+            return 1
+        overrides.append(f"output.directory={json.dumps(args.output)}")
 
     try:
         config = load_config(args.config, overrides)
@@ -101,10 +129,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(exc, file=sys.stderr)
         return 1
 
+    stl_path = resolve_stl_path(config, args.config)
     if args.show_config:
         print(json.dumps(config.to_dict(), indent=2))
     else:
-        print(describe(config))
+        print(describe(config, stl_path))
     for note in config.warnings():
         print(f"warning: {note}", file=sys.stderr)
 
@@ -125,7 +154,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     for note in report.warnings:
         print(f"warning: {note}", file=sys.stderr)
 
-    stl_path = Path(config.output.stl_path)
     solid = build_solid(config, hf)
     if not solid.is_watertight:  # a bug, not a user error; never hand a broken STL to a CAM tool
         print("error: internal error: generated mesh is not watertight", file=sys.stderr)

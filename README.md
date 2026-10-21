@@ -4,13 +4,9 @@ Generate a choppy-water surface and export it as a watertight STL for CNC millin
 The piece is a **disc** or a **rectangle** with a flat bottom and a choppy-water top, and every
 model and milling parameter lives in one TOML config file.
 
-| Calm | Choppy (default) | Stormy | Plaque |
+| Calm | Choppy (default) | Choppy Gerstner | Swell and chop plaque |
 |:---:|:---:|:---:|:---:|
-| ![calm](docs/images/calm.png) | ![choppy](docs/images/choppy.png) | ![stormy](docs/images/stormy.png) | ![plaque](docs/images/plaque.png) |
-
-| Swell and chop |
-|:---:|
-| ![swell and chop](docs/images/swell_and_chop.png) |
+| ![calm](docs/images/calm.png) | ![choppy](docs/images/choppy.png) | ![choppy gerstner](docs/images/choppy_gerstner.png) | ![plaque](docs/images/plaque.png) |
 
 *Shaded previews written by the tool. Presets live in [examples/](examples/).*
 
@@ -40,14 +36,15 @@ pip install -e ".[preview]"   # add ,dev for the test tools
 
 ```bash
 choppy-water                                       # defaults: 3 in disc from 1 in stock
-choppy-water --config examples/stormy.toml         # a preset
+choppy-water --config examples/choppy_gerstner.toml  # a preset
 choppy-water --seed 7 --set water.choppiness=0.5   # tweak from the command line
 choppy-water --write-config my.toml                # commented defaults to edit
 choppy-water --config my.toml --check              # validate without generating
 ```
 
-A default run takes roughly 15 seconds and writes, next to `output.stl_path`:
-`choppy_water.stl`, a `.png` preview, a `_milling.txt` report and a `.json` run record.
+A run takes roughly 15 seconds and writes a folder named after the config file, for example
+`output/choppy_gerstner/` for `examples/choppy_gerstner.toml` (`output/choppy_water/` with no config):
+`choppy_gerstner.stl`, a `.png` preview, a `_milling.txt` report and a `.json` run record.
 
 ## Configuration
 

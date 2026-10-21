@@ -1,0 +1,12 @@
+# Choppy Gerstner: the same choppy look as the default, built from a sum of 64 Gerstner waves
+# instead of an FFT sea. Slightly more regular, and a little cheaper to compute.
+
+[water]
+method                 = "gerstner"
+seed                   = 21
+wavelength_dominant    = 0.8
+wavelength_min         = 0.3
+wavelength_max         = 1.6
+directional_spread_deg = 40.0
+choppiness             = 0.8
+relief                 = 0.25

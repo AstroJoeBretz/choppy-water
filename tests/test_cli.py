@@ -44,23 +44,29 @@ def test_invalid_config_returns_1(capsys):
 
 
 def test_output_shortcut_handles_windows_paths(capsys):
-    assert main(["--check", "--show-config", "-o", r"C:\out dir\x.stl"]) == 0
+    assert main(["--check", "--show-config", "-o", r"C:\out dir"]) == 0
     out = capsys.readouterr().out
-    assert json.loads(out[: out.rindex("}") + 1])["output"]["stl_path"] == r"C:\out dir\x.stl"
+    assert json.loads(out[: out.rindex("}") + 1])["output"]["directory"] == r"C:\out dir"
+
+
+def test_output_option_rejects_a_file_name(capsys):
+    assert main(["--check", "-o", "output/sea.stl"]) == 1
+    assert "takes a folder" in capsys.readouterr().err
 
 
 def test_run_writes_stl_preview_and_record(tmp_path, capsys):
-    stl = tmp_path / "out" / "sea.stl"
-    assert main([*FAST, "-o", str(stl)]) == 0
+    assert main([*FAST, "-o", str(tmp_path / "out")]) == 0
     out = capsys.readouterr().out
     assert "triangles" in out
 
-    triangles = read_stl(stl)
+    folder = tmp_path / "out" / "choppy_water"  # a subfolder, never the parent itself
+    assert not list((tmp_path / "out").glob("*.*"))
+    triangles = read_stl(folder / "choppy_water.stl")
     assert len(triangles) > 1000
     assert triangles[..., 2].min() == 0  # flat bottom on the build plane
-    assert (tmp_path / "out" / "sea.png").is_file()
+    assert (folder / "choppy_water.png").is_file()
 
-    record = json.loads((tmp_path / "out" / "sea.json").read_text(encoding="utf-8"))
+    record = json.loads((folder / "choppy_water.json").read_text(encoding="utf-8"))
     assert record["mesh"]["watertight"] is True
     assert record["mesh"]["triangles"] == len(triangles)
     assert record["config"]["part"]["diameter"] == 3.0
@@ -68,21 +74,63 @@ def test_run_writes_stl_preview_and_record(tmp_path, capsys):
 
 
 def test_run_in_inches_and_rect(tmp_path):
-    stl = tmp_path / "r.stl"
     args = [
         *FAST,
         "--set", "part.shape=rect",
         "--set", "output.stl_units='in'",
         "--set", "output.preview=false",
-        "-o", str(stl),
+        "-o", str(tmp_path),
     ]  # fmt: skip
     assert main(args) == 0
-    tri = read_stl(stl)
+    tri = read_stl(tmp_path / "choppy_water" / "choppy_water.stl")
     assert tri[..., 0].max() == 2.0  # half of the default 4 in width, now in inches
-    assert not (tmp_path / "r.png").exists()
+    assert not (tmp_path / "choppy_water" / "choppy_water.png").exists()
 
 
 def test_run_reports_folded_surface(tmp_path, capsys):
-    args = [*FAST, "--set", "water.choppiness=3", "-o", str(tmp_path / "a.stl")]
+    args = [*FAST, "--set", "water.choppiness=3", "-o", str(tmp_path)]
     assert main(args) == 0
     assert "folds over itself" in capsys.readouterr().err
+
+
+def test_outputs_go_in_a_folder_named_after_the_config(tmp_path, monkeypatch):
+    config = tmp_path / "my_sea.toml"
+    config.write_text('[output]\ndirectory = "results"\n', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    assert main(["--config", "my_sea.toml", *FAST]) == 0
+    folder = tmp_path / "results" / "my_sea"
+    assert sorted(p.name for p in folder.iterdir()) == [
+        "my_sea.json",
+        "my_sea.png",
+        "my_sea.stl",
+        "my_sea_milling.txt",
+    ]
+
+
+def test_default_run_uses_the_choppy_water_folder(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert main([*FAST, "--set", "output.preview=false"]) == 0
+    assert (tmp_path / "output" / "choppy_water" / "choppy_water.stl").is_file()
+
+
+def test_two_configs_do_not_overwrite_each_other(tmp_path, monkeypatch):
+    for name, seed in (("a", 1), ("b", 2)):
+        (tmp_path / f"{name}.toml").write_text(f"[water]\nseed = {seed}\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    for name in ("a", "b"):
+        assert main(["--config", f"{name}.toml", *FAST, "--set", "output.preview=false"]) == 0
+    a = (tmp_path / "output" / "a" / "a.stl").read_bytes()
+    b = (tmp_path / "output" / "b" / "b.stl").read_bytes()
+    assert a != b
+
+
+def test_explicit_output_path_overrides_the_folder_layout(tmp_path, monkeypatch):
+    config = tmp_path / "x.toml"
+    config.write_text("", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path / "flat" / "exact.stl"
+    args = ["--config", "x.toml", *FAST, "--set", "output.preview=false",
+            "--set", f"output.stl_path={json.dumps(str(target))}"]  # fmt: skip
+    assert main(args) == 0
+    assert target.is_file()
+    assert not (tmp_path / "output").exists()

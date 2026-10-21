@@ -92,17 +92,29 @@ the crests of the two layers rarely coincide.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `output.stl_path` | `"output/choppy_water.stl"` | Where to write the STL. Related files share its name. |
+| `output.directory` | `"output"` | Parent folder for results. Each run gets its own subfolder named after the config file (`choppy_water` when run with no config file). Also settable with `-o DIR`. |
+| `output.stl_path` | `""` | Optional exact STL path, used instead of the automatic folder. The other files are written next to it with the same name. |
 | `output.stl_units` | `"mm"` | Units written into the STL (`"mm"` or `"in"`). STL files carry no unit; most CAM tools assume mm. |
 | `output.preview` | `true` | Also write a shaded PNG preview. Needs `matplotlib` (`pip install "choppy-water[preview]"`). |
 
 ## Files written
 
-For `output.stl_path = "output/sea.stl"`:
+Running `choppy-water --config examples/choppy_gerstner.toml` creates a folder named after the config file:
+
+```
+output/choppy_gerstner/
+    choppy_gerstner.stl
+    choppy_gerstner.png
+    choppy_gerstner.json
+    choppy_gerstner_milling.txt
+```
+
+Re-running the same config overwrites that folder's files; a different config gets its own folder.
+With no `--config` the folder is `output/choppy_water/`.
 
 | File | Contents |
 |---|---|
-| `sea.stl` | Watertight binary STL, flat bottom at z = 0. |
-| `sea.png` | Shaded preview of the surface (if `output.preview`). |
-| `sea.json` | Resolved config, surface and mesh measurements, milling numbers. Feeding its `config` block back in reproduces the STL. |
-| `sea_milling.txt` | Plain-text milling report. |
+| `<name>.stl` | Watertight binary STL, flat bottom at z = 0. |
+| `<name>.png` | Shaded preview of the surface (if `output.preview`). |
+| `<name>.json` | Resolved config, surface and mesh measurements, milling numbers. Feeding its `config` block back in reproduces the STL. |
+| `<name>_milling.txt` | Plain-text milling report. |

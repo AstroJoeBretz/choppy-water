@@ -79,8 +79,12 @@ def test_default_toml_shows_the_chop_block_with_the_real_defaults():
     assert cfg.chop == ChopLayer()
 
 
-def test_there_is_at_least_a_calm_a_choppy_and_a_stormy_preset():
-    assert {"calm", "choppy", "stormy"} <= {p.stem for p in EXAMPLES}
+def test_the_core_presets_exist():
+    assert {"calm", "choppy", "choppy_gerstner", "plaque"} <= {p.stem for p in EXAMPLES}
+
+
+def test_the_gerstner_example_uses_gerstner():
+    assert load_config(ROOT / "examples" / "choppy_gerstner.toml").water.method == "gerstner"
 
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: p.stem)

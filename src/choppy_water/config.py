@@ -119,7 +119,8 @@ class Milling:
 
 @dataclass(frozen=True)
 class Output:
-    stl_path: str = "output/choppy_water.stl"
+    directory: str = "output"
+    stl_path: str = ""  # empty = automatic: <directory>/<config name>/<config name>.stl
     stl_units: str = "mm"
     preview: bool = True
 
@@ -337,7 +338,7 @@ class Config:
         need(ml.spindle_rpm > 0, "milling.spindle_rpm: must be > 0")
 
         need(o.stl_units in LENGTH_UNITS, f"output.stl_units: must be one of {LENGTH_UNITS}")
-        need(bool(o.stl_path.strip()), "output.stl_path: must not be empty")
+        need(bool(o.directory.strip()), "output.directory: must not be empty")
         return errors
 
     def warnings(self) -> list[str]:

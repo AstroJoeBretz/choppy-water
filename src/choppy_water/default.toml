@@ -63,6 +63,7 @@ plunge_rate         = 20.0   # length per minute
 spindle_rpm         = 16000
 
 [output]
-stl_path  = "output/choppy_water.stl"
+directory = "output"         # results go in <directory>/<config file name>/
+stl_path  = ""               # optional: an exact STL path instead (related files share its name)
 stl_units = "mm"             # "mm" | "in"; most CAM tools assume mm
 preview   = true

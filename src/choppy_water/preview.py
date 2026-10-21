@@ -47,9 +47,9 @@ def save_preview(hf: Heightfield, path: str | Path, vert_exag: float = 1.0) -> P
 
 
 def save_preview_3d(
-    hf: Heightfield, path: str | Path, vert_exag: float = 2.0, elev: float = 35, azim: float = -58
+    hf: Heightfield, path: str | Path, vert_exag: float = 1.0, elev: float = 35, azim: float = -58
 ) -> Path:
-    """Angled 3D view of the surface, so the relief is visible (heights are exaggerated)."""
+    """Angled 3D view of the surface at true proportions (``vert_exag`` scales heights)."""
     plt, light_source = _matplotlib()
     step = max(1, round(hf.z.shape[1] / VIEW_3D_SAMPLES))
     z = hf.z[::step, ::step]

@@ -9,7 +9,7 @@ model and milling parameter lives in one TOML config file.
 | ![calm](docs/images/calm.png) | ![choppy](docs/images/choppy.png) | ![choppy gerstner](docs/images/choppy_gerstner.png) | ![plaque](docs/images/plaque.png) |
 | ![calm, 3D view](docs/images/calm_3d.png) | ![choppy, 3D view](docs/images/choppy_3d.png) | ![choppy gerstner, 3D view](docs/images/choppy_gerstner_3d.png) | ![plaque, 3D view](docs/images/plaque_3d.png) |
 
-*Previews written by the tool: top-down and an angled 3D view (heights exaggerated 2x). The
+*Previews written by the tool: top-down and an angled 3D view (true proportions). The
 configs behind them are the built-in examples; list them with `choppy-water --list-examples`.*
 
 ## Features

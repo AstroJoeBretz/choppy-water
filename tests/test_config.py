@@ -186,7 +186,7 @@ def test_load_config_errors(tmp_path):
         load_config(tmp_path / "missing.toml")
     bad = tmp_path / "bad.toml"
     bad.write_text("[part\n", encoding="utf-8")
-    with pytest.raises(ConfigError, match="invalid TOML"):
+    with pytest.raises(ConfigError, match="invalid file"):
         load_config(bad)
 
 
@@ -269,3 +269,41 @@ def test_chop_table_in_a_toml_file(tmp_path):
     path = tmp_path / "c.toml"
     path.write_text("[water]\nrelief = 0.15\n[water.chop]\nrelief = 0.07\n", encoding="utf-8")
     assert load_config(path).chop.relief == 0.07
+
+
+# -- packaged examples and JSON run records ---------------------------------------------------
+
+
+def test_examples_are_listed_and_loadable():
+    from choppy_water.config import example_names, example_summary, example_text
+
+    names = example_names()
+    assert names == sorted(names) and "calm" in names
+    for name in names:
+        assert load_config(text=example_text(name)).validate() == []
+        assert example_summary(name)
+
+
+def test_unknown_example_names_the_available_ones():
+    from choppy_water.config import example_text
+
+    with pytest.raises(ConfigError, match="unknown example 'nope'.*calm"):
+        example_text("nope")
+
+
+def test_load_config_from_text_and_bad_text():
+    assert load_config(text="[part]\nshape = 'rect'\n").part.shape == "rect"
+    with pytest.raises(ConfigError, match="invalid TOML"):
+        load_config(text="[part\n")
+
+
+def test_json_run_record_loads_as_a_config(tmp_path):
+    import json
+
+    cfg = load_config(None, ["water.relief=0.15", "water.chop.relief=0.06", "part.shape=rect"])
+    record = tmp_path / "run.json"
+    record.write_text(json.dumps({"version": "x", "config": cfg.to_dict()}), encoding="utf-8")
+    assert load_config(record) == cfg
+    record.write_text("{not json", encoding="utf-8")
+    with pytest.raises(ConfigError, match="invalid file"):
+        load_config(record)

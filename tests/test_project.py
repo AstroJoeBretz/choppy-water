@@ -7,12 +7,19 @@ from pathlib import Path
 import pytest
 
 from choppy_water import __version__
-from choppy_water.config import Config, default_config_text, load_config
+from choppy_water.config import (
+    Config,
+    default_config_text,
+    example_names,
+    example_summary,
+    example_text,
+    load_config,
+)
 from choppy_water.heightfield import generate_heightfield
 from choppy_water.milling import plan_milling
 
 ROOT = Path(__file__).resolve().parents[1]
-EXAMPLES = sorted((ROOT / "examples").glob("*.toml"))
+EXAMPLES = example_names()
 
 
 def test_version_matches_pyproject():
@@ -80,22 +87,32 @@ def test_default_toml_shows_the_chop_block_with_the_real_defaults():
 
 
 def test_the_core_presets_exist():
-    assert {"calm", "choppy", "choppy_gerstner", "plaque"} <= {p.stem for p in EXAMPLES}
+    assert {"calm", "choppy", "choppy_gerstner", "plaque"} <= set(EXAMPLES)
+
+
+def test_examples_live_in_the_package_so_installs_have_them():
+    on_disk = {p.stem for p in (ROOT / "src" / "choppy_water" / "examples").glob("*.toml")}
+    assert on_disk == set(EXAMPLES)
 
 
 def test_the_gerstner_example_uses_gerstner():
-    assert load_config(ROOT / "examples" / "choppy_gerstner.toml").water.method == "gerstner"
+    assert load_config(text=example_text("choppy_gerstner")).water.method == "gerstner"
 
 
-@pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: p.stem)
-def test_example_is_valid_and_has_a_gallery_image(path):
-    load_config(path)
-    assert (ROOT / "docs" / "images" / f"{path.stem}.png").is_file()
+@pytest.mark.parametrize("name", EXAMPLES)
+def test_example_is_valid_described_and_in_the_gallery(name):
+    load_config(text=example_text(name))
+    assert example_summary(name)
+    for suffix in ("", "_3d"):
+        assert (ROOT / "docs" / "images" / f"{name}{suffix}.png").is_file()
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert f"docs/images/{name}.png" in readme
+    assert f"docs/images/{name}_3d.png" in readme
 
 
-@pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: p.stem)
-def test_example_generates_within_its_stock(path):
-    config = load_config(path, ["mesh.grid_spacing=0.04"])  # coarse: this checks wiring, not looks
+@pytest.mark.parametrize("name", EXAMPLES)
+def test_example_generates_within_its_stock(name):
+    config = load_config(text=example_text(name), overrides=["mesh.grid_spacing=0.04"])  # coarse
     milled, report = plan_milling(config, generate_heightfield(config))
     inside = milled.z[milled.mask]
     mm = config.to_mm()

@@ -1,4 +1,4 @@
-"""Regenerate the README gallery: one preview PNG per example config.
+"""Regenerate the README gallery: top-down and 3D preview PNGs for every built-in example.
 
 Run from the repository root:  python scripts/make_gallery.py
 """
@@ -8,21 +8,22 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from choppy_water.config import load_config
+from choppy_water.config import example_names, example_text, load_config
 from choppy_water.heightfield import generate_heightfield
 from choppy_water.milling import plan_milling
-from choppy_water.preview import save_preview
+from choppy_water.preview import save_preview, save_preview_3d
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> int:
     out_dir = ROOT / "docs" / "images"
-    for config_path in sorted((ROOT / "examples").glob("*.toml")):
-        config = load_config(config_path)
+    for name in example_names():
+        config = load_config(text=example_text(name))
         hf, report = plan_milling(config, generate_heightfield(config))
-        png = save_preview(hf, out_dir / f"{config_path.stem}.png")
-        print(f"{config_path.name}: {png.relative_to(ROOT)}")
+        top = save_preview(hf, out_dir / f"{name}.png")
+        view = save_preview_3d(hf, out_dir / f"{name}_3d.png")
+        print(f"{name}: {top.relative_to(ROOT)}, {view.relative_to(ROOT)}")
         for warning in report.warnings:
             print(f"  warning: {warning}")
     return 0

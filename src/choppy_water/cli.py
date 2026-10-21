@@ -9,13 +9,23 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from choppy_water import __version__
-from choppy_water.config import Config, ConfigError, default_config_text, load_config
+from choppy_water.config import (
+    Config,
+    ConfigError,
+    default_config_text,
+    example_names,
+    example_summary,
+    example_text,
+    load_config,
+)
 from choppy_water.heightfield import generate_heightfield
 from choppy_water.mesh import build_solid
 from choppy_water.milling import format_report, plan_milling
-from choppy_water.preview import save_preview
+from choppy_water.preview import save_preview, save_preview_3d
 from choppy_water.record import write_run_record
 from choppy_water.stl_io import write_stl
+
+DEFAULT_RUN_NAME = "choppy_water"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -23,7 +33,22 @@ def build_parser() -> argparse.ArgumentParser:
         prog="choppy-water",
         description="Generate a choppy-water surface as an STL for CNC milling.",
     )
-    parser.add_argument("-c", "--config", help="path to a TOML config (defaults if omitted)")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument(
+        "-c",
+        "--config",
+        help="path to a TOML config, or a .json run record to reproduce a run "
+        "(defaults if omitted)",
+    )
+    source.add_argument(
+        "-e",
+        "--example",
+        metavar="NAME",
+        help="use a built-in example config (see --list-examples)",
+    )
+    parser.add_argument(
+        "--list-examples", action="store_true", help="list the built-in examples and exit"
+    )
     parser.add_argument(
         "-s",
         "--set",
@@ -54,18 +79,20 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-DEFAULT_RUN_NAME = "choppy_water"
+def run_name(args: argparse.Namespace) -> str:
+    """Name of this run: the config file's stem, the example's name, or ``choppy_water``."""
+    if args.config:
+        return Path(args.config).stem
+    return args.example or DEFAULT_RUN_NAME
 
 
-def resolve_stl_path(config: Config, config_path: str | Path | None) -> Path:
+def resolve_stl_path(config: Config, name: str) -> Path:
     """Where the STL goes: ``output.stl_path`` if set, else ``<directory>/<name>/<name>.stl``.
 
-    ``name`` is the config file's name without extension (``choppy_water`` with no file), so
-    each config gets its own folder holding the STL, preview, report and run record.
+    Each config gets its own folder holding the STL, previews, report and run record.
     """
     if config.output.stl_path:
         return Path(config.output.stl_path)
-    name = Path(config_path).stem if config_path else DEFAULT_RUN_NAME
     return Path(config.output.directory) / name / f"{name}.stl"
 
 
@@ -99,8 +126,30 @@ def describe(config: Config, stl_path: Path) -> str:
     )
 
 
+def progress(message: str) -> None:
+    """Progress goes to stderr so stdout stays the clean summary."""
+    print(f"... {message}", file=sys.stderr, flush=True)
+
+
+def write_previews(hf, stl_path: Path) -> list[Path]:
+    """Write the top-down and 3D previews; a missing matplotlib is a warning, not a failure."""
+    try:
+        return [
+            save_preview(hf, stl_path.with_suffix(".png")),
+            save_preview_3d(hf, stl_path.with_name(stl_path.stem + "_3d.png")),
+        ]
+    except RuntimeError as exc:
+        print(f"warning: skipped previews: {exc}", file=sys.stderr)
+        return []
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.list_examples:
+        width = max(len(name) for name in example_names())
+        for name in example_names():
+            print(f"{name:<{width}}  {example_summary(name)}")
+        return 0
     if args.write_config:
         target = Path(args.write_config)
         if target.exists():
@@ -124,12 +173,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         overrides.append(f"output.directory={json.dumps(args.output)}")
 
     try:
-        config = load_config(args.config, overrides)
+        text = example_text(args.example) if args.example else None
+        config = load_config(args.config, overrides, text=text)
     except ConfigError as exc:
         print(exc, file=sys.stderr)
         return 1
 
-    stl_path = resolve_stl_path(config, args.config)
+    stl_path = resolve_stl_path(config, run_name(args))
     if args.show_config:
         print(json.dumps(config.to_dict(), indent=2))
     else:
@@ -141,11 +191,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("Configuration OK.")
         return 0
 
+    layers = 2 if config.chop is not None else 1
+    progress(f"generating the surface ({layers} wave layer{'s' if layers > 1 else ''})")
     try:
         ideal = generate_heightfield(config)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    progress("checking what the cutter can reach")
     hf, report = plan_milling(config, ideal)
     print(
         f"Surface: {hf.z.shape[1]} x {hf.z.shape[0]} grid, relief {hf.stats.relief:.2f} mm, "
@@ -154,10 +207,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     for note in report.warnings:
         print(f"warning: {note}", file=sys.stderr)
 
+    progress("building the mesh")
     solid = build_solid(config, hf)
     if not solid.is_watertight:  # a bug, not a user error; never hand a broken STL to a CAM tool
         print("error: internal error: generated mesh is not watertight", file=sys.stderr)
         return 1
+    progress("writing files")
     write_stl(solid, stl_path, config.output.stl_units)
     write_run_record(stl_path.with_suffix(".json"), config, hf, solid, report)
     report_path = stl_path.with_name(stl_path.stem + "_milling.txt")
@@ -177,12 +232,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     if config.output.preview:
-        try:
-            png = save_preview(hf, stl_path.with_suffix(".png"))
-        except RuntimeError as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            return 1
-        print(f"Preview: {png}")
+        progress("rendering previews")
+        for png in write_previews(hf, stl_path):
+            print(f"Preview: {png}")
     return 0
 
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import dataclasses
 import difflib
+import json
 import math
 import tomllib
 from collections.abc import Mapping, Sequence
@@ -398,17 +399,60 @@ def parse_override(text: str) -> tuple[str, str, Any]:
     return section, key, value
 
 
-def load_config(path: str | Path | None = None, overrides: Sequence[str] = ()) -> Config:
-    """Load a config file (or pure defaults) and apply ``section.key=value`` overrides."""
+def _examples_dir() -> Any:
+    return resources.files("choppy_water").joinpath("examples")
+
+
+def example_names() -> list[str]:
+    """Names of the example configs shipped inside the package (``calm``, ``choppy``, ...)."""
+    return sorted(
+        p.name[: -len(".toml")] for p in _examples_dir().iterdir() if p.name.endswith(".toml")
+    )
+
+
+def example_text(name: str) -> str:
+    """TOML text of a packaged example; raises :class:`ConfigError` for an unknown name."""
+    path = _examples_dir().joinpath(f"{name}.toml")
+    if not path.is_file():
+        raise ConfigError([f"unknown example '{name}'; available: {', '.join(example_names())}"])
+    return path.read_text(encoding="utf-8")
+
+
+def example_summary(name: str) -> str:
+    """One-line description: the example file's first comment line."""
+    first = example_text(name).splitlines()[0]
+    return first.lstrip("#").strip()
+
+
+def load_config(
+    path: str | Path | None = None,
+    overrides: Sequence[str] = (),
+    *,
+    text: str | None = None,
+) -> Config:
+    """Load a config and apply ``section.key=value`` overrides.
+
+    The source is TOML ``text`` if given, else the file at ``path`` (TOML, or a ``.json`` run
+    record written next to an STL, which reproduces that run), else the built-in defaults.
+    """
     raw: dict[str, dict[str, Any]] = {}
-    if path is not None:
+    if text is not None:
         try:
-            with open(path, "rb") as fh:
-                raw = tomllib.load(fh)
+            raw = tomllib.loads(text)
+        except tomllib.TOMLDecodeError as exc:
+            raise ConfigError([f"invalid TOML: {exc}"]) from None
+    elif path is not None:
+        try:
+            if Path(path).suffix.lower() == ".json":
+                data = json.loads(Path(path).read_text(encoding="utf-8"))
+                raw = data.get("config", data) if isinstance(data, dict) else {}
+            else:
+                with open(path, "rb") as fh:
+                    raw = tomllib.load(fh)
         except FileNotFoundError:
             raise ConfigError([f"config file not found: {path}"]) from None
-        except tomllib.TOMLDecodeError as exc:
-            raise ConfigError([f"{path}: invalid TOML: {exc}"]) from None
+        except (tomllib.TOMLDecodeError, json.JSONDecodeError) as exc:
+            raise ConfigError([f"{path}: invalid file: {exc}"]) from None
     for text in overrides:
         section, key, value = parse_override(text)
         table = raw.setdefault(section, {})

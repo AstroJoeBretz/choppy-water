@@ -1,5 +1,5 @@
-# Choppy Gerstner: the same choppy look as the default, built from a sum of 64 Gerstner waves
-# instead of an FFT sea. Slightly more regular, and a little cheaper to compute.
+# Choppy Gerstner: the choppy look built from Gerstner waves instead of an FFT sea.
+# A sum of 64 Gerstner waves: slightly more regular, and a little cheaper to compute.
 
 [water]
 method                 = "gerstner"

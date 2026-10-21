@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from choppy_water.cli import main
 from choppy_water.stl_io import read_stl
 
@@ -103,6 +105,7 @@ def test_outputs_go_in_a_folder_named_after_the_config(tmp_path, monkeypatch):
         "my_sea.json",
         "my_sea.png",
         "my_sea.stl",
+        "my_sea_3d.png",
         "my_sea_milling.txt",
     ]
 
@@ -134,3 +137,63 @@ def test_explicit_output_path_overrides_the_folder_layout(tmp_path, monkeypatch)
     assert main(args) == 0
     assert target.is_file()
     assert not (tmp_path / "output").exists()
+
+
+# -- examples, progress, previews, reproducing a run ---------------------------------------------
+
+
+def test_list_examples(capsys):
+    assert main(["--list-examples"]) == 0
+    out = capsys.readouterr().out
+    assert "calm" in out and "plaque" in out and "Gerstner" in out
+
+
+def test_example_option_runs_a_built_in_config(tmp_path, capsys):
+    args = ["--example", "calm", "--check", "-o", str(tmp_path)]
+    assert main(args) == 0
+    assert str(tmp_path / "calm" / "calm.stl") in capsys.readouterr().out
+
+
+def test_unknown_example_fails_cleanly(capsys):
+    assert main(["--example", "nope", "--check"]) == 1
+    assert "available:" in capsys.readouterr().err
+
+
+def test_config_and_example_are_mutually_exclusive(capsys):
+    with pytest.raises(SystemExit):
+        main(["--config", "a.toml", "--example", "calm"])
+
+
+def test_run_writes_both_previews_and_reports_progress(tmp_path, capsys):
+    assert main(["--example", "plaque", *FAST, "-o", str(tmp_path)]) == 0
+    folder = tmp_path / "plaque"
+    assert (folder / "plaque_3d.png").stat().st_size > 1000
+    assert (folder / "plaque.png").is_file()
+    err = capsys.readouterr().err
+    assert "generating the surface (2 wave layers)" in err
+    assert "building the mesh" in err and "rendering previews" in err
+
+
+def test_missing_matplotlib_skips_previews_but_still_succeeds(tmp_path, monkeypatch, capsys):
+    def no_matplotlib(*args, **kwargs):
+        raise RuntimeError("previews need matplotlib")
+
+    monkeypatch.setattr("choppy_water.cli.save_preview", no_matplotlib)
+    assert main([*FAST, "-o", str(tmp_path)]) == 0
+    folder = tmp_path / "choppy_water"
+    assert (folder / "choppy_water.stl").is_file()
+    assert not (folder / "choppy_water.png").exists()
+    assert "skipped previews" in capsys.readouterr().err
+
+
+def test_a_json_run_record_reproduces_the_run_exactly(tmp_path):
+    first = tmp_path / "first"
+    args = ["--example", "plaque", *FAST, "--seed", "5", "--set", "output.preview=false"]
+    assert main([*args, "-o", str(first)]) == 0
+    record = first / "plaque" / "plaque.json"
+
+    again = tmp_path / "again"
+    assert main(["--config", str(record), "--set", "output.preview=false", "-o", str(again)]) == 0
+    one = (first / "plaque" / "plaque.stl").read_bytes()
+    two = (again / "plaque" / "plaque.stl").read_bytes()
+    assert one == two

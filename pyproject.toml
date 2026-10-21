@@ -26,6 +26,11 @@ dependencies = [
     "scipy>=1.11",
 ]
 
+[project.urls]
+Homepage = "https://github.com/AstroJoeBretz/choppy-water"
+Issues = "https://github.com/AstroJoeBretz/choppy-water/issues"
+Changelog = "https://github.com/AstroJoeBretz/choppy-water/blob/main/CHANGELOG.md"
+
 [project.optional-dependencies]
 preview = ["matplotlib>=3.8"]
 dev = [

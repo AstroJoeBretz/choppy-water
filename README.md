@@ -1,5 +1,7 @@
 # choppy-water
 
+[![CI](https://github.com/AstroJoeBretz/choppy-water/actions/workflows/ci.yml/badge.svg)](https://github.com/AstroJoeBretz/choppy-water/actions/workflows/ci.yml)
+
 Generate a choppy-water surface and export it as a watertight STL for CNC milling in wood.
 The piece is a **disc** or a **rectangle** with a flat bottom and a choppy-water top, and every
 model and milling parameter lives in one TOML config file.
@@ -46,7 +48,7 @@ The details, formulas and code layout are in [docs/ARCHITECTURE.md](docs/ARCHITE
 Requires Python 3.11+. Not yet on PyPI, so install from a clone:
 
 ```bash
-git clone <this repository>
+git clone https://github.com/AstroJoeBretz/choppy-water.git
 cd choppy-water
 python -m venv .venv
 pip install -e ".[preview]"   # add ,dev for the test tools
